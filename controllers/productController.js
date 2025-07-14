@@ -1,16 +1,29 @@
 // controllers/productController.js
 const ProductModel = require('../models/productModel');
 
-//GET /api/products-by-type?product=GIN
+// GET /api/products-by-type?products=["scotch","bourbon"]
 exports.getProductsByType = async (req, res) => {
   try {
-    const product = req.query.product;
+    const rawParam = req.query.products;
 
-    if (!product || typeof product !== 'string') {
-      return res.status(400).json({ error: 'Missing or invalid "product" query parameter' });
+    if (!rawParam) {
+      return res.status(400).json({ error: 'Missing "products" query parameter' });
+    }
+    console.log("query params received");
+    console.log(rawParam);
+
+    const productsArray = typeof rawParam === 'string'
+      ? JSON.parse(rawParam)
+      : rawParam;
+
+    if (!Array.isArray(productsArray)) {
+      return res.status(400).json({ error: '"products" must be an array of strings' });
     }
 
-    const results = await ProductModel.findProductsByType(product);
+    console.log("products array extracted");
+    console.log(productsArray);
+
+    const results = await ProductModel.findProductsByTypes(productsArray);
 
     if (!results.length) {
       return res.status(404).json({ message: 'No matching product types found.' });
