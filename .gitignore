@@ -1,0 +1,57 @@
+# Node modules
+node_modules/
+
+# Environment config
+.env
+.env.*.local
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Logs
+logs/
+*.log
+*.csv
+*.out
+*.pid
+*.seed
+*.pid.lock
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Optional npm cache folder
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Editor folders
+.vscode/
+.idea/
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Build artifacts
+dist/
+build/
+
+# MySQL dumps
+*.sql
+
+# Mac/Linux backup files
+*.swp
+*.swo
+*~
+
+# GitHub Codespaces
+.devcontainer/
+
+# Local database files
+*.sqlite
+*.db
