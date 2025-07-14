@@ -9,19 +9,27 @@ exports.getProductsByType = async (req, res) => {
     if (!rawParam) {
       return res.status(400).json({ error: 'Missing "products" query parameter' });
     }
-    console.log("query params received");
-    console.log(rawParam);
+    console.log('🔍 Raw param:', rawParam);
 
-    const productsArray = typeof rawParam === 'string'
-      ? JSON.parse(rawParam)
-      : rawParam;
+    let productsArray;
+
+    if (Array.isArray(rawParam)) {
+      productsArray = rawParam; // e.g. ?products=scotch&products=bourbon
+    } else if (typeof rawParam === 'string') {
+      if (rawParam.trim().startsWith('[')) {
+        productsArray = JSON.parse(rawParam); // JSON array
+      } else {
+        productsArray = rawParam.split(',').map(p => p.trim()); // Comma-separated
+      }
+    } else {
+      return res.status(400).json({ error: '"products" must be an array or comma-separated string' });
+    }
+
+    console.log('📦 Normalized array:', productsArray);
 
     if (!Array.isArray(productsArray)) {
       return res.status(400).json({ error: '"products" must be an array of strings' });
     }
-
-    console.log("products array extracted");
-    console.log(productsArray);
 
     const results = await ProductModel.findProductsByTypes(productsArray);
 
@@ -35,6 +43,7 @@ exports.getProductsByType = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 
 exports.matchProducts = async (req, res) => {
