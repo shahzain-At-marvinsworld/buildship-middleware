@@ -34,6 +34,57 @@ const InventoryModel = require('../models/inventoryModel');
 // };
 
 // controllers/inventoryController.js
+// exports.checkInventory = async (req, res) => {
+//   try {
+//     const rawParam = req.query.product_list;
+//     const limit = parseInt(req.query.limit, 10) || 50;
+//     const offset = parseInt(req.query.offset, 10) || 0;
+
+//     if (!rawParam) {
+//       return res.status(400).json({ error: 'Missing product_list query param' });
+//     }
+
+//     console.log('🔍 Raw param:', rawParam);
+
+
+//     let productArray;
+
+//     // 💡 Handle both JSON string or comma-separated brand names
+//     if (typeof rawParam === 'string') {
+//       try {
+//         const parsed = JSON.parse(rawParam);
+//         productArray = Array.isArray(parsed)
+//           ? parsed
+//           : parsed.split(',').map(brand => ({ brand: brand.trim() }));
+//       } catch {
+//         // fallback for Buildship-style comma-delimited list
+//         productArray = rawParam.split(',').map(brand => ({ brand: brand.trim() }));
+//       }
+//     } else {
+//       productArray = rawParam;
+//     }
+
+//     if (!Array.isArray(productArray)) {
+//       return res.status(400).json({ error: 'product_list must be an array of objects or brand names' });
+//     }
+
+//     console.log('📦 Normalized array:', productArray);
+
+
+//     const results = await InventoryModel.findInventoryByBrands(productArray, limit, offset);
+
+//     if (!results.length) {
+//       return res.status(404).json({ message: 'No matching inventory found.' });
+//     }
+
+//     res.json(results);
+//   } catch (err) {
+//     console.error('Inventory brand search error:', err);
+//     res.status(500).json({ error: 'Internal Server Error' });
+//   }
+// };
+
+// controllers/inventoryController.js
 exports.checkInventory = async (req, res) => {
   try {
     const rawParam = req.query.product_list;
@@ -46,30 +97,37 @@ exports.checkInventory = async (req, res) => {
 
     console.log('🔍 Raw param:', rawParam);
 
-
     let productArray;
 
-    // 💡 Handle both JSON string or comma-separated brand names
     if (typeof rawParam === 'string') {
+      // Handle Postman-style or Buildship stringified JSON
       try {
         const parsed = JSON.parse(rawParam);
         productArray = Array.isArray(parsed)
           ? parsed
-          : parsed.split(',').map(brand => ({ brand: brand.trim() }));
+          : [parsed];
       } catch {
-        // fallback for Buildship-style comma-delimited list
+        // Fallback: comma-delimited brand strings
         productArray = rawParam.split(',').map(brand => ({ brand: brand.trim() }));
       }
-    } else {
+    } else if (Array.isArray(rawParam)) {
+      // 🛠️ Check for Buildship-style `[object Object]`
+      if (rawParam.every(item => typeof item === 'string' && item.includes('[object Object]'))) {
+        return res.status(400).json({ error: 'Malformed array. Did you send raw objects as strings?' });
+      }
       productArray = rawParam;
-    }
-
-    if (!Array.isArray(productArray)) {
-      return res.status(400).json({ error: 'product_list must be an array of objects or brand names' });
+    } else if (typeof rawParam === 'object') {
+      // Possibly already parsed (rare case)
+      productArray = [rawParam];
+    } else {
+      return res.status(400).json({ error: 'Unrecognized product_list format' });
     }
 
     console.log('📦 Normalized array:', productArray);
 
+    if (!Array.isArray(productArray)) {
+      return res.status(400).json({ error: 'product_list must be an array of objects' });
+    }
 
     const results = await InventoryModel.findInventoryByBrands(productArray, limit, offset);
 
@@ -79,10 +137,11 @@ exports.checkInventory = async (req, res) => {
 
     res.json(results);
   } catch (err) {
-    console.error('Inventory brand search error:', err);
+    console.error('❌ Inventory brand search error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 
 exports.getInventoryBySKU = async (req, res) => {
