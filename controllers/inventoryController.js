@@ -34,57 +34,6 @@ const InventoryModel = require('../models/inventoryModel');
 // };
 
 // controllers/inventoryController.js
-// exports.checkInventory = async (req, res) => {
-//   try {
-//     const rawParam = req.query.product_list;
-//     const limit = parseInt(req.query.limit, 10) || 50;
-//     const offset = parseInt(req.query.offset, 10) || 0;
-
-//     if (!rawParam) {
-//       return res.status(400).json({ error: 'Missing product_list query param' });
-//     }
-
-//     console.log('🔍 Raw param:', rawParam);
-
-
-//     let productArray;
-
-//     // 💡 Handle both JSON string or comma-separated brand names
-//     if (typeof rawParam === 'string') {
-//       try {
-//         const parsed = JSON.parse(rawParam);
-//         productArray = Array.isArray(parsed)
-//           ? parsed
-//           : parsed.split(',').map(brand => ({ brand: brand.trim() }));
-//       } catch {
-//         // fallback for Buildship-style comma-delimited list
-//         productArray = rawParam.split(',').map(brand => ({ brand: brand.trim() }));
-//       }
-//     } else {
-//       productArray = rawParam;
-//     }
-
-//     if (!Array.isArray(productArray)) {
-//       return res.status(400).json({ error: 'product_list must be an array of objects or brand names' });
-//     }
-
-//     console.log('📦 Normalized array:', productArray);
-
-
-//     const results = await InventoryModel.findInventoryByBrands(productArray, limit, offset);
-
-//     if (!results.length) {
-//       return res.status(404).json({ message: 'No matching inventory found.' });
-//     }
-
-//     res.json(results);
-//   } catch (err) {
-//     console.error('Inventory brand search error:', err);
-//     res.status(500).json({ error: 'Internal Server Error' });
-//   }
-// };
-
-// controllers/inventoryController.js
 exports.checkInventory = async (req, res) => {
   try {
     const rawParam = req.query.product_list;
@@ -142,6 +91,35 @@ exports.checkInventory = async (req, res) => {
   }
 };
 
+// controllers/inventoryController.js
+exports.checkInventoryPost = async (req, res) => {
+  try {
+    console.log('🔍 Req body received:', req.body);
+    
+    const productArray = req.body.product_list;
+    const limit = parseInt(req.body.limit, 10) || 50;
+    const offset = parseInt(req.body.offset, 10) || 0;
+
+    if (!Array.isArray(productArray) || !productArray.length) {
+      return res.status(400).json({ error: 'product_list must be a non-empty array of objects' });
+    }
+
+    console.log('📦 POST body product_list:', productArray);
+
+    const results = await InventoryModel.findInventoryByBrands(productArray, limit, offset);
+
+    if (!results.length) {
+      return res.status(404).json({ message: 'No matching inventory found.' });
+    }
+
+    res.json(results);
+  } catch (err) {
+    console.error('❌ Inventory POST brand search error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+
 
 
 exports.getInventoryBySKU = async (req, res) => {
@@ -165,4 +143,4 @@ exports.getInventoryBySKU = async (req, res) => {
     console.error('Inventory check error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
-};
+}
