@@ -32,6 +32,19 @@ const InventoryModel = require('../models/inventoryModel');
 //     res.status(500).json({ error: 'Internal Server Error' });
 //   }
 // };
+// Helper function to convert price string into a range
+function convertPriceToRange(priceString) {
+  const pricePattern = /^(under|below|above|greater|less)?\s*\$?(\d+)(?:\s*(and|to)\s*\$?(\d+))?/i;
+  const match = priceString.match(pricePattern);
+
+  if (!match) return null; // Invalid price format
+
+  const operator = match[1]?.toLowerCase() === 'under' || match[1]?.toLowerCase() === 'below' ? '<' : '>';
+  const lowerPrice = parseFloat(match[2]);
+  const upperPrice = match[4] ? parseFloat(match[4]) : null;
+
+  return { operator, lowerPrice, upperPrice };
+}
 
 // controllers/inventoryController.js
 exports.checkInventory = async (req, res) => {
@@ -120,6 +133,98 @@ exports.checkInventoryPost = async (req, res) => {
 };
 
 
+exports.searchInventoryPost = async (req, res) => {
+  try {
+    const { product_list, limit = 50, offset = 0 } = req.body;
+
+    if (!Array.isArray(product_list) || !product_list.length) {
+      return res.status(400).json({ error: 'product_list must be a non-empty array of objects' });
+    }
+
+    const results = [];
+
+    // Loop through each object in the product_list
+    for (const item of product_list) {
+      let { brand, type, price, size } = item;
+
+      // Step 1: Search by product type
+      let searchResults = await InventoryModel.findInventoryByType(type, limit, offset);
+
+    console.log("search results returned from the model method ---------------------->", searchResults);
+
+
+      // Step 2: Filter based on price if provided
+      if (price) {
+        const priceRange = convertPriceToRange(price);
+        if (priceRange) {
+          searchResults = searchResults.filter((product) => {
+            const productPrice = product.rprice;
+
+            if (priceRange.upperPrice) {
+              return priceRange.operator === '<'
+                ? productPrice < priceRange.lowerPrice
+                : productPrice > priceRange.lowerPrice;
+            } else {
+              return priceRange.operator === '<'
+                ? productPrice < priceRange.lowerPrice
+                : productPrice > priceRange.lowerPrice;
+            }
+          });
+        } else {
+          return res.status(400).json({ error: 'Invalid price format' });
+        }
+      }
+
+      // Step 3: Filter based on other fields (brand, size) if they are present
+      searchResults = searchResults.filter((product) => {
+        let isMatch = true;
+
+        // Check if the product name contains the brand (case-insensitive match)
+        if (brand && !product.name.toLowerCase().includes(brand.toLowerCase())) {
+          isMatch = false;
+        }
+
+        // Check if the size matches (if provided)
+        if (size && (product.sname.toLowerCase() !== size.toLowerCase())) {
+          isMatch = false;
+        }
+
+        return isMatch;
+      });
+
+      // Push the filtered results for this specific object
+      if (searchResults.length) {
+        results.push({ product: item, matches: searchResults });
+      }
+    }
+
+    if (!results.length) {
+      return res.status(404).json({ message: 'No matching inventory found.' });
+    }
+
+    res.json(results);
+  } catch (err) {
+    console.error('❌ Inventory brand search error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+exports.searchProducts = async (req, res) => {
+  try {
+    const { product_list, limit = 10, offset = 0 } = req.body;
+
+    if (!Array.isArray(product_list)) {
+      return res.status(400).json({ error: 'product_list must be an array' });
+    }
+
+    const data = await InventoryModel.searchInventoryByCriteria(product_list, limit, offset);
+    res.json({ success: true, data });
+
+  } catch (error) {
+    console.error('Error searching products:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
 
 
 exports.getInventoryBySKU = async (req, res) => {
