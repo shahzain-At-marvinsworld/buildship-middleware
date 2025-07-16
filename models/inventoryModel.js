@@ -1,31 +1,4 @@
-// models/inventoryModel.js
-const db = require('../db');
-
-// exports.findInventoryByProductTypes = async (productTypes, limit = 50, offset = 0) => {
-//   if (!productTypes.length) return [];
-
-//   const conditions = [];
-//   const values = [];
-
-//   for (const type of productTypes) {
-//     if (type.productType) {
-//       conditions.push(`LOWER(name) REGEXP ?`);
-//       values.push(`\\b${type.productType.toLowerCase()}\\b`);
-//     }
-//   }
-
-//   const whereClause = conditions.length ? conditions.join(' OR ') : '1=0'; // fallback to no match
-//     const sql = `
-//     SELECT * FROM inventory
-//     WHERE ${whereClause}
-//     ORDER BY updated_at DESC
-//     LIMIT ${limit}
-//     OFFSET ${offset}
-//   `;
-
-//   const [rows] = await db.execute(sql, values);
-//   return rows;
-// };
+const db = require("../db");
 
 // models/inventoryModel.js
 exports.findInventoryByBrands = async (productList, limit = 50, offset = 0) => {
@@ -35,8 +8,8 @@ exports.findInventoryByBrands = async (productList, limit = 50, offset = 0) => {
   const values = [];
 
   for (const item of productList) {
-    const type = typeof item === 'string' ? item : item.type;
-    if (type && typeof type === 'string') {
+    const type = typeof item === "string" ? item : item.type;
+    if (type && typeof type === "string") {
       conditions.push(`LOWER(name) REGEXP ?`);
       values.push(`\\b${type.toLowerCase()}\\b`);
     }
@@ -44,7 +17,7 @@ exports.findInventoryByBrands = async (productList, limit = 50, offset = 0) => {
 
   if (!conditions.length) return [];
 
-  const whereClause = conditions.join(' OR ');
+  const whereClause = conditions.join(" OR ");
   const sql = `
     SELECT * FROM inventory
     WHERE ${whereClause}
@@ -57,123 +30,88 @@ exports.findInventoryByBrands = async (productList, limit = 50, offset = 0) => {
   return rows;
 };
 
-
-exports.findInventoryByType = async (type, limit = 50, offset = 0) => {
-  if (!type) return [];
-
-    console.log("running SQL query for type", type);
-
-  const sql = `
-    SELECT * FROM inventory
-    WHERE LOWER(name) LIKE ?
-    ORDER BY updated_at DESC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `;
-
-  console.log("sql query being run for search---->", sql)
-
-  // Use LIKE for a simple string match
-  const [rows] = await db.execute(sql, [`%\\b${type.toLowerCase()}\\b%`, limit, offset]);
-  return rows;
-};
-
 function parsePriceCondition(priceStr) {
   const match = priceStr.match(/under\s*\$\s*(\d+)/i);
   return match ? parseFloat(match[1]) : null;
 }
 
-exports.searchInventoryByCriteria = async (productList, limit = 10, offset = 0) => {
+exports.searchInventoryByNameOrBooze = async (
+  productList,
+  limit = 10,
+  offset = 0
+) => {
   let results = [];
 
-  console.log('Starting inventory search...');
-  console.log(`Total products to search: ${productList.length}`);
+  console.log("Starting inventory search [name/booze-based]...");
 
   for (const [index, product] of productList.entries()) {
-    const { type, brand, price, size } = product;
-    console.log(`\n Processing product [${index + 1}/${productList.length}]:`, product);
+    const { name, booze, rprice, sname } = product;
+    console.log(
+      `\nProcessing product [${index + 1}/${productList.length}]:`,
+      product
+    );
 
-    if (!type) {
-      console.warn(`Skipping product - missing "type" field.`);
+    let baseQuery = "";
+    let baseParams = [];
+
+    // STEP 1: Determine search base
+    if (name && name.trim() !== "") {
+      baseQuery = `SELECT * FROM inventory WHERE LOWER(name) LIKE ? LIMIT ? OFFSET ?`;
+      baseParams = [`%${name.toLowerCase()}%`, limit, offset];
+      console.log(`Searching by name: '${name}'`);
+    } else if (booze && booze.trim() !== "") {
+      baseQuery = `SELECT * FROM inventory WHERE LOWER(booze) LIKE ? LIMIT ? OFFSET ?`;
+      baseParams = [`%${booze.toLowerCase()}%`, limit, offset];
+      console.log(`Searching by booze: '${booze}'`);
+    } else {
+      console.warn(`Skipping product [${index}] — no name or booze key.`);
       continue;
     }
 
-    // STEP 1: Query only by type
-    const regexPattern = `\\b${type}\\b`;
-    console.log(`Querying inventory for type: '${type}' using regex: '${regexPattern}'`);
-
-    const [initialRows] = await db.query(
-      `SELECT * FROM inventory WHERE REGEXP_LIKE(name, ?, 'i') LIMIT ? OFFSET ?`,
-      [regexPattern, limit, offset]
-    );
-
-    console.log(`Found ${initialRows.length} results for type '${type}'`);
+    const [initialRows] = await db.query(baseQuery, baseParams);
+    console.log(`Found ${initialRows.length} initial rows`);
 
     let filtered = initialRows;
 
-    // STEP 2: Filter on brand
-    if (brand && brand.toLowerCase() !== 'null') {
-      const beforeBrand = filtered;
-      filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(brand.toLowerCase())
-      );
-
-      console.log(`Brand filter: '${brand}' ${filtered.length} matches`);
-
-      if (filtered.length === 0) {
-        console.log(`Brand filter returned empty. Reverting to previous results.`);
-        filtered = beforeBrand;
-      }
-    }
-
-    // STEP 3: Filter on price
-    const maxPrice = parsePriceCondition(price);
+    // STEP 2: Filter on price
+    const maxPrice = parsePriceCondition(rprice);
     if (maxPrice) {
       const beforePrice = filtered;
-      filtered = filtered.filter(item =>
-        parseFloat(item.rprice) < maxPrice
+      filtered = filtered.filter((item) => parseFloat(item.rprice) < maxPrice);
+      console.log(
+        `Filter: rprice under $${maxPrice}  ${filtered.length} matches`
       );
-
-      console.log(`Price filter: under $${maxPrice}  ${filtered.length} matches`);
-
       if (filtered.length === 0) {
-        console.log(`Price filter returned empty. Reverting to previous results.`);
+        console.log("Price filter returned empty. Reverting.");
         filtered = beforePrice;
       }
     }
 
-    // STEP 4: Filter on size
-    if (size && size.toLowerCase() !== 'null') {
-      const sizeInt = parseInt(size.replace(/[^\d]/g, ''));
-      if (!isNaN(sizeInt)) {
-        const beforeSize = filtered;
-        filtered = filtered.filter(item => parseInt(item.ml) === sizeInt);
-
-        console.log(`Size filter: ${sizeInt}ml ${filtered.length} matches`);
-
-        if (filtered.length === 0) {
-          console.log(`Size filter returned empty. Reverting to previous results.`);
-          filtered = beforeSize;
-        }
-      } else {
-        console.warn(`⚠️ Could not parse size: '${size}'`);
+    // STEP 3: Filter on sname
+    if (sname && sname.toLowerCase() !== "null") {
+      const beforeSize = filtered;
+      filtered = filtered.filter(
+        (item) => item.sname.toLowerCase() === sname.toLowerCase()
+      );
+      console.log(`Filter: sname = '${sname}' ${filtered.length} matches`);
+      if (filtered.length === 0) {
+        console.log("Size filter returned empty. Reverting.");
+        filtered = beforeSize;
       }
     }
 
     results.push({ product, matches: filtered });
-    console.log(`✅ Final matches for this product: ${filtered.length}`);
+    console.log(`Final matches for product: ${filtered.length}`);
   }
 
-  console.log(`\n🎯 Completed search for all products.\n`);
+  console.log(`\nCompleted search for all products.\n`);
   return results;
 };
-
-
 
 exports.findInventoryBySKUs = async (skuArray) => {
   if (!skuArray.length) return [];
 
-  const placeholders = skuArray.map(() => '?').join(', ');
+  const placeholders = skuArray.map(() => "?").join(", ");
   const sql = `SELECT * FROM inventory WHERE sku IN (${placeholders})`;
 
   const [rows] = await db.execute(sql, skuArray);
