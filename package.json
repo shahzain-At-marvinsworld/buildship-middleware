@@ -5,7 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "fetch-inventory-values": "node scripts/fetchInventoryColumnValues.js"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +16,8 @@
     "body-parser": "^2.2.0",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
-    "mysql2": "^3.14.2"
+    "mysql2": "^3.14.2",
+    "openai": "^5.12.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

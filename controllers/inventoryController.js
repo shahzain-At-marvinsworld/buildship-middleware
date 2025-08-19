@@ -71,6 +71,38 @@ exports.searchByNameOrBooze = async (req, res) => {
   }
 };
 
+exports.searchDynamic = async (req, res) => {
+  const start = Date.now();
+  try {
+    const { product_list, limit = 10, offset = 0 } = req.body;
+
+    if (!Array.isArray(product_list)) {
+      return res.status(400).json({ error: "product_list must be an array" });
+    }
+
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+
+    console.log(`📦 Incoming search for ${product_list.length} products`);
+    console.log(`🔁 Pagination: limit=${parsedLimit}, offset=${parsedOffset}`);
+
+    const data = await InventoryModel.searchInventoryDynamic(
+      product_list,
+      parsedLimit,
+      parsedOffset
+    );
+
+    const duration = Date.now() - start;
+    console.log(`✅ Search complete in ${duration}ms`);
+
+    res.json({ success: true, count: data.length, data });
+  } catch (error) {
+    console.error("❌ Error in name/booze search:", error);
+    res.status(500).json({ success: false, error: "Internal server error" });
+  }
+};
+
+
 exports.getInventoryBySKU = async (req, res) => {
   try {
     const skus = req.query.skus ? JSON.parse(req.query.skus) : req.body.skus;
